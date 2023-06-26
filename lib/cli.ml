@@ -8,13 +8,27 @@ let to_force_flag (flag : bool) : Git.force_flag =
 let to_tag_action (is_delete : bool) : Git.tag_action =
   if is_delete then Git.Delete else Git.Create
 
+(* Autocompletion rules for the 'switch' command *)
+let switch_completion : string list =
+  let branch_completions =
+    (* TODO: Implement logic to fetch available branches from your Git repository *)
+    [ "branch1"; "branch2"; "branch3" ]
+  in
+  let completer : string -> string list =
+   fun substring ->
+    List.filter branch_completions (fun branch ->
+        String.is_prefix ~prefix:substring branch)
+  in
+  List.sort_uniq String.compare branch_completions
+
 (* Commands *)
 
 let cmd_clear =
   Command.basic
     ~summary:"Clear all local changes without the ability to recover"
     (let%map_open.Command force =
-       flag "f" ~aliases:["--force"] no_arg ~doc:"Clear forcefully without asking any questions"
+       flag "f" ~aliases:[ "--force" ] no_arg
+         ~doc:"Clear forcefully without asking any questions"
      in
      fun () -> Git.clear (to_force_flag force))
 
@@ -40,7 +54,8 @@ let cmd_new =
 let cmd_push =
   Command.basic ~summary:"Push the current branch to origin"
     (let%map_open.Command force =
-       flag "f" ~aliases:["--force"] no_arg ~doc:"Push forcefully and override changes"
+       flag "f" ~aliases:[ "--force" ] no_arg
+         ~doc:"Push forcefully and override changes"
      in
      fun () -> Git.push (to_force_flag force))
 
@@ -61,21 +76,27 @@ let cmd_status =
      in
      fun () -> Git.status commit)
 
-let cmd_switch =
+let cmd_aswitch =
   Command.basic ~summary:"Switch to [branch] and sync it with origin"
     (let%map_open.Command branch = anon (maybe ("branch" %: string)) in
+     fun () -> Git.switch branch)
+
+let cmd_switch =
+  Command.basic ~summary:"Switch to [branch] and sync it with origin"
+    (let%map_open.Command branch =
+       anon (maybe ~autocomplete:switch_completion ("branch" %: string))
+     in
      fun () -> Git.switch branch)
 
 let cmd_sync =
   Command.basic ~summary:"Sync local branch with the remote branch"
     (let%map_open.Command force =
-       flag "f" ~aliases:["--force"] no_arg
+       flag "f" ~aliases:[ "--force" ] no_arg
          ~doc:
            "Sync forcefully by overriding local version with the remote one \
             instead of rebasing"
      in
      fun () -> Git.sync (to_force_flag force))
-
 
 let cmd_tag =
   Command.basic ~summary:"Create or delete (and push) tags"
